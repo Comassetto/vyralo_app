@@ -1,20 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { getToken } from '@auth/core/jwt'
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   if (pathname === '/login' || pathname === '/admin/login') {
     return NextResponse.next()
   }
 
+  const isSecure = process.env.NODE_ENV === 'production'
+
   const token = await getToken({
     req,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET!,
+    secureCookie: isSecure,
   })
 
   if (pathname.startsWith('/admin')) {
-    if (!token || token.role !== 'ADMIN') {
+    if (!token || (token as any).role !== 'ADMIN') {
       return NextResponse.redirect(new URL('/admin/login', req.url))
     }
     return NextResponse.next()
@@ -28,7 +32,7 @@ export async function middleware(req: NextRequest) {
     if (!token) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
-    if (token.role === 'ADMIN') {
+    if ((token as any).role === 'ADMIN') {
       return NextResponse.redirect(new URL('/admin/dashboard', req.url))
     }
     return NextResponse.next()
